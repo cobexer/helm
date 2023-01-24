@@ -206,6 +206,7 @@ func newRootCmd(actionConfig *action.Configuration, out io.Writer, args []string
 	)
 
 	cmd.AddCommand(
+		newAliasCmd(actionConfig, out),
 		newRegistryCmd(actionConfig, out),
 		newPushCmd(actionConfig, out),
 	)
