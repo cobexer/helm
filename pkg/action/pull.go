@@ -18,19 +18,18 @@ package action
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
 
-	"helm.sh/helm/v3/pkg/chartutil"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/downloader"
-	"helm.sh/helm/v3/pkg/getter"
-	"helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/chartutil"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/downloader"
+	"helm.sh/helm/v4/pkg/getter"
+	"helm.sh/helm/v4/pkg/registry"
+	"helm.sh/helm/v4/pkg/repo"
 )
 
 // Pull is the action for checking a given release's information.
@@ -57,19 +56,19 @@ func WithConfig(cfg *Configuration) PullOpt {
 	}
 }
 
-// NewPull creates a new Pull object.
-func NewPull() *Pull {
-	return NewPullWithOpts()
-}
-
-// NewPullWithOpts creates a new pull, with configuration options.
-func NewPullWithOpts(opts ...PullOpt) *Pull {
+// NewPull creates a new Pull with configuration options.
+func NewPull(opts ...PullOpt) *Pull {
 	p := &Pull{}
 	for _, fn := range opts {
 		fn(p)
 	}
 
 	return p
+}
+
+// SetRegistryClient sets the registry client on the pull configuration object.
+func (p *Pull) SetRegistryClient(client *registry.Client) {
+	p.cfg.RegistryClient = client
 }
 
 // Run executes 'helm pull' against the given release.
@@ -86,6 +85,7 @@ func (p *Pull) Run(chartRef string) (string, error) {
 			getter.WithPassCredentialsAll(p.PassCredentialsAll),
 			getter.WithTLSClientConfig(p.CertFile, p.KeyFile, p.CaFile),
 			getter.WithInsecureSkipVerifyTLS(p.InsecureSkipTLSverify),
+			getter.WithPlainHTTP(p.PlainHTTP),
 		},
 		RegistryClient:   p.cfg.RegistryClient,
 		RepositoryConfig: p.Settings.RepositoryConfig,
@@ -95,6 +95,7 @@ func (p *Pull) Run(chartRef string) (string, error) {
 	if registry.IsOCI(chartRef) {
 		c.Options = append(c.Options,
 			getter.WithRegistryClient(p.cfg.RegistryClient))
+		c.RegistryClient = p.cfg.RegistryClient
 	}
 
 	if p.Verify {
@@ -108,7 +109,7 @@ func (p *Pull) Run(chartRef string) (string, error) {
 	dest := p.DestDir
 	if p.Untar {
 		var err error
-		dest, err = ioutil.TempDir("", "helm-")
+		dest, err = os.MkdirTemp("", "helm-")
 		if err != nil {
 			return out.String(), errors.Wrap(err, "failed to untar")
 		}
